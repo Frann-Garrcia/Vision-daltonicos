@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulador Visual Biomédico</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #000; color: #fff; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Contenedor de cámara */
+        #camera-container { position: relative; flex: 1; width: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; transition: filter 0.3s ease; }
+        
+        /* Capas superpuestas para Glaucoma y Macular */
+        #overlay { position: absolute; inset: 0; pointer-events: none; transition: background 0.3s ease; }
+
+        /* Filtros Patológicos */
+        .filter-normal { filter: none; }
+        .filter-daltonismo { filter: url('#deuteranopia'); }
+        .filter-cataratas { filter: blur(4px) contrast(65%) brightness(105%) sepia(45%); }
+        
+        .overlay-glaucoma { background: radial-gradient(circle at center, transparent 15%, rgba(0,0,0,0.92) 32%, #000 50%); }
+        .overlay-macular { background: radial-gradient(circle at center, rgba(30,25,20,0.96) 12%, rgba(30,25,20,0.7) 22%, transparent 35%); }
+
+        /* UI Superior */
+        #header { position: absolute; top: 15px; left: 15px; right: 15px; z-index: 10; background: rgba(0,0,0,0.65); padding: 10px 15px; border-radius: 12px; backdrop-filter: blur(5px); text-align: center; border: 1px solid rgba(255,255,255,0.15); }
+        #status-title { font-weight: 700; font-size: 1rem; color: #38bdf8; }
+        #status-desc { font-size: 0.8rem; color: #cbd5e1; margin-top: 2px; }
+
+        /* Controles Inferiores */
+        #controls { position: relative; z-index: 10; background: #0f172a; padding: 12px 10px 24px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; border-top: 1px solid #1e293b; }
+        button { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 12px 8px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        button.active { background: #0284c7; border-color: #38bdf8; color: #fff; box-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+        
+        /* Pantalla de inicio */
+        #start-screen { position: fixed; inset: 0; background: #0f172a; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+        #start-btn { background: #0284c7; color: white; border: none; padding: 16px 32px; font-size: 1.1rem; border-radius: 12px; margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- Pantalla inicial para pedir permiso de cámara -->
+    <div id="start-screen">
+        <h2>Simulador de Visión Clínica</h2>
+        <p style="color: #94a3b8; margin-top: 10px; font-size: 0.95rem;">Pulsa el botón y acepta el permiso de cámara para experimentar cómo percibe el entorno un paciente o profesional con patologías visuales.</p>
+        <button id="start-btn" onclick="startCamera()">Activar Cámara</button>
+    </div>
+
+    <!-- Indicador de estado -->
+    <div id="header">
+        <div id="status-title">Visión Estándar</div>
+        <div id="status-desc">Sin alteraciones visuales aplicadas</div>
+    </div>
+
+    <!-- Visor de cámara -->
+    <div id="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <div id="overlay"></div>
+    </div>
+
+    <!-- Botonera -->
+    <div id="controls">
+        <button class="active" onclick="setFilter('normal', this)">Visión Normal</button>
+        <button onclick="setFilter('daltonismo', this)">Daltonismo (Rojo/Verde)</button>
+        <button onclick="setFilter('cataratas', this)">Cataratas Avanzadas</button>
+        <button onclick="setFilter('glaucoma', this)">Glaucoma (Túnel)</button>
+    </div>
+
+    <!-- Matriz SVG científica para simulación de Deuteranopía -->
+    <svg style="display: none;">
+        <defs>
+            <filter id="deuteranopia">
+                <feColorMatrix type="matrix" values="
+                    0.625, 0.375, 0,   0, 0
+                    0.700, 0.300, 0,   0, 0
+                    0,     0.300, 0.7, 0, 0
+                    0,     0,     0,   1, 0"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <script>
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const title = document.getElementById('status-title');
+        const desc = document.getElementById('status-desc');
+
+        const info = {
+            normal: { t: "Visión Estándar", d: "Percepción cromática y campo visual completos." },
+            daltonismo: { t: "Deuteranopía (Daltonismo)", d: "Confusión crítica entre rojos, verdes y naranjas." },
+            cataratas: { t: "Cataratas Severas", d: "Pérdida de contraste, deslumbramiento y opacidad." },
+            glaucoma: { t: "Glaucoma Avanzado", d: "Pérdida severa de visión periférica (visión en túnel)." }
+        };
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } },
+                    audio: false
+                });
+                video.srcObject = stream;
+                document.getElementById('start-screen').style.display = 'none';
+            } catch (err) {
+                alert("No se pudo acceder a la cámara. Asegúrate de abrir la web en Safari/Chrome (no dentro de Instagram/WhatsApp) y aceptar los permisos.");
+            }
+        }
+
+        function setFilter(type, btn) {
+            // Resetear clases
+            video.className = '';
+            overlay.className = '';
+            document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+            
+            // Activar botón
+            btn.classList.add('active');
+            title.innerText = info[type].t;
+            desc.innerText = info[type].d;
+
+            // Aplicar filtro
+            if (type === 'daltonismo') video.classList.add('filter-daltonismo');
+            if (type === 'cataratas') video.classList.add('filter-cataratas');
+            if (type === 'glaucoma') overlay.classList.add('overlay-glaucoma');
+        }
+    </script>
+</body>
+</html>
