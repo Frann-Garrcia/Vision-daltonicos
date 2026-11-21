@@ -2,80 +2,207 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Simulador Visual Biomédico</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-        body { background: #000; color: #fff; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        /* Uso de 100dvh para que no se corte con las barras de Chrome/Safari */
+        body { 
+            background: #000; 
+            color: #fff; 
+            overflow: hidden; 
+            height: 100vh; 
+            height: 100dvh; 
+            display: flex; 
+            flex-direction: column; 
+        }
         
         /* Contenedor de cámara */
-        #camera-container { position: relative; flex: 1; width: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #camera-container { 
+            position: relative; 
+            flex: 1; 
+            width: 100%; 
+            min-height: 0;
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
         video { width: 100%; height: 100%; object-fit: cover; transition: filter 0.3s ease; }
         
-        /* Capas superpuestas para Glaucoma y Macular */
-        #overlay { position: absolute; inset: 0; pointer-events: none; transition: background 0.3s ease; }
+        /* Capas superpuestas para efectos espaciales y manchas */
+        #overlay { position: absolute; inset: 0; pointer-events: none; transition: all 0.3s ease; }
 
-        /* Filtros Patológicos */
+        /* Filtros Patológicos (Video) */
         .filter-normal { filter: none; }
-        .filter-daltonismo { filter: url('#deuteranopia'); }
-        .filter-cataratas { filter: blur(4px) contrast(65%) brightness(105%) sepia(45%); }
-        
-        .overlay-glaucoma { background: radial-gradient(circle at center, transparent 15%, rgba(0,0,0,0.92) 32%, #000 50%); }
-        .overlay-macular { background: radial-gradient(circle at center, rgba(30,25,20,0.96) 12%, rgba(30,25,20,0.7) 22%, transparent 35%); }
+        .filter-deuteranopia { filter: url('#deuteranopia'); }
+        .filter-tritanopia { filter: url('#tritanopia'); }
+        .filter-acromatopsia { filter: grayscale(100%) contrast(110%); }
+        .filter-cataratas { filter: blur(4px) contrast(62%) brightness(108%) sepia(48%); }
+        .filter-retinopatia { filter: blur(1.5px) contrast(85%); }
+
+        /* Overlays Patológicos (Campo Visual) */
+        .overlay-glaucoma { 
+            background: radial-gradient(circle at center, transparent 14%, rgba(0,0,0,0.94) 30%, #000 48%); 
+        }
+        .overlay-macular { 
+            background: radial-gradient(circle at center, rgba(25,20,18,0.98) 13%, rgba(35,30,25,0.85) 22%, transparent 34%); 
+        }
+        .overlay-retinopatia {
+            background-image: 
+                radial-gradient(circle at 28% 35%, rgba(15,10,10,0.95) 4%, transparent 11%),
+                radial-gradient(circle at 72% 28%, rgba(15,10,10,0.92) 6%, transparent 14%),
+                radial-gradient(circle at 65% 70%, rgba(15,10,10,0.96) 5%, transparent 13%),
+                radial-gradient(circle at 35% 68%, rgba(15,10,10,0.9) 3%, transparent 9%),
+                radial-gradient(circle at 50% 45%, rgba(15,10,10,0.85) 2%, transparent 7%);
+        }
 
         /* UI Superior */
-        #header { position: absolute; top: 15px; left: 15px; right: 15px; z-index: 10; background: rgba(0,0,0,0.65); padding: 10px 15px; border-radius: 12px; backdrop-filter: blur(5px); text-align: center; border: 1px solid rgba(255,255,255,0.15); }
-        #status-title { font-weight: 700; font-size: 1rem; color: #38bdf8; }
-        #status-desc { font-size: 0.8rem; color: #cbd5e1; margin-top: 2px; }
+        #header { 
+            position: absolute; 
+            top: max(12px, env(safe-area-inset-top)); 
+            left: 12px; 
+            right: 12px; 
+            z-index: 10; 
+            background: rgba(15, 23, 42, 0.78); 
+            padding: 10px 14px; 
+            border-radius: 12px; 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            text-align: center; 
+            border: 1px solid rgba(255,255,255,0.15); 
+        }
+        #status-title { font-weight: 700; font-size: 0.95rem; color: #38bdf8; }
+        #status-desc { font-size: 0.78rem; color: #e2e8f0; margin-top: 2px; line-height: 1.25; }
 
-        /* Controles Inferiores */
-        #controls { position: relative; z-index: 10; background: #0f172a; padding: 12px 10px 24px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; border-top: 1px solid #1e293b; }
-        button { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 12px 8px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        button.active { background: #0284c7; border-color: #38bdf8; color: #fff; box-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+        /* Controles Inferiores Deslizables */
+        #controls-wrapper {
+            position: relative;
+            z-index: 10;
+            background: #0f172a;
+            border-top: 1px solid #1e293b;
+            padding-top: 8px;
+            padding-bottom: max(14px, env(safe-area-inset-bottom));
+        }
+        #scroll-hint {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+        #controls { 
+            display: flex; 
+            overflow-x: auto; 
+            gap: 8px; 
+            padding: 0 12px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+        }
+        #controls::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+
+        button.filter-btn { 
+            flex: 0 0 auto;
+            background: #1e293b; 
+            color: #f8fafc; 
+            border: 1px solid #334155; 
+            padding: 11px 16px; 
+            border-radius: 10px; 
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            white-space: nowrap;
+        }
+        button.filter-btn.active { 
+            background: #0284c7; 
+            border-color: #38bdf8; 
+            color: #fff; 
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.45); 
+        }
         
         /* Pantalla de inicio */
-        #start-screen { position: fixed; inset: 0; background: #0f172a; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-        #start-btn { background: #0284c7; color: white; border: none; padding: 16px 32px; font-size: 1.1rem; border-radius: 12px; margin-top: 20px; font-weight: bold; }
+        #start-screen { 
+            position: fixed; 
+            inset: 0; 
+            background: #0f172a; 
+            z-index: 50; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 24px; 
+            text-align: center; 
+        }
+        #start-btn { 
+            background: #0284c7; 
+            color: white; 
+            border: none; 
+            padding: 16px 32px; 
+            font-size: 1.1rem; 
+            border-radius: 12px; 
+            margin-top: 22px; 
+            font-weight: bold; 
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Pantalla inicial para pedir permiso de cámara -->
+    <!-- Pantalla inicial -->
     <div id="start-screen">
         <h2>Simulador de Visión Clínica</h2>
-        <p style="color: #94a3b8; margin-top: 10px; font-size: 0.95rem;">Pulsa el botón y acepta el permiso de cámara para experimentar cómo percibe el entorno un paciente o profesional con patologías visuales.</p>
+        <p style="color: #94a3b8; margin-top: 10px; font-size: 0.95rem; max-width: 340px;">Pulsa el botón y acepta el permiso de cámara para experimentar cómo percibe el entorno un paciente o profesional con patologías visuales.</p>
         <button id="start-btn" onclick="startCamera()">Activar Cámara</button>
     </div>
 
     <!-- Indicador de estado -->
     <div id="header">
         <div id="status-title">Visión Estándar</div>
-        <div id="status-desc">Sin alteraciones visuales aplicadas</div>
+        <div id="status-desc">Percepción cromática y campo visual completos.</div>
     </div>
 
     <!-- Visor de cámara -->
     <div id="camera-container">
-        <video id="video" autoplay playsinline></video>
+        <video id="video" autoplay playsinline muted></video>
         <div id="overlay"></div>
     </div>
 
-    <!-- Botonera -->
-    <div id="controls">
-        <button class="active" onclick="setFilter('normal', this)">Visión Normal</button>
-        <button onclick="setFilter('daltonismo', this)">Daltonismo (Rojo/Verde)</button>
-        <button onclick="setFilter('cataratas', this)">Cataratas Avanzadas</button>
-        <button onclick="setFilter('glaucoma', this)">Glaucoma (Túnel)</button>
+    <!-- Botonera deslizable -->
+    <div id="controls-wrapper">
+        <div id="scroll-hint">← Desliza para cambiar de patología →</div>
+        <div id="controls">
+            <button class="filter-btn active" onclick="setFilter('normal', this)">Visión Normal</button>
+            <button class="filter-btn" onclick="setFilter('deuteranopia', this)">Daltonismo (Rojo/Verde)</button>
+            <button class="filter-btn" onclick="setFilter('tritanopia', this)">Daltonismo (Azul/Amarillo)</button>
+            <button class="filter-btn" onclick="setFilter('acromatopsia', this)">Acromatopsia (Sin color)</button>
+            <button class="filter-btn" onclick="setFilter('cataratas', this)">Cataratas Avanzadas</button>
+            <button class="filter-btn" onclick="setFilter('glaucoma', this)">Glaucoma (Túnel)</button>
+            <button class="filter-btn" onclick="setFilter('macular', this)">Degeneración Macular</button>
+            <button class="filter-btn" onclick="setFilter('retinopatia', this)">Retinopatía Diabética</button>
+        </div>
     </div>
 
-    <!-- Matriz SVG científica para simulación de Deuteranopía -->
-    <svg style="display: none;">
+    <!-- Matrices SVG científicas para daltonismo -->
+    <svg style="display: none; position: absolute; width: 0; height: 0;">
         <defs>
+            <!-- Deuteranopía (Ceguera al verde/rojo) -->
             <filter id="deuteranopia">
                 <feColorMatrix type="matrix" values="
                     0.625, 0.375, 0,   0, 0
                     0.700, 0.300, 0,   0, 0
                     0,     0.300, 0.7, 0, 0
                     0,     0,     0,   1, 0"/>
+            </filter>
+            <!-- Tritanopía (Ceguera al azul/amarillo) -->
+            <filter id="tritanopia">
+                <feColorMatrix type="matrix" values="
+                    0.95, 0.05,  0,     0, 0
+                    0,    0.433, 0.567, 0, 0
+                    0,    0.475, 0.525, 0, 0
+                    0,    0,     0,     1, 0"/>
             </filter>
         </defs>
     </svg>
@@ -88,9 +215,13 @@
 
         const info = {
             normal: { t: "Visión Estándar", d: "Percepción cromática y campo visual completos." },
-            daltonismo: { t: "Deuteranopía (Daltonismo)", d: "Confusión crítica entre rojos, verdes y naranjas." },
-            cataratas: { t: "Cataratas Severas", d: "Pérdida de contraste, deslumbramiento y opacidad." },
-            glaucoma: { t: "Glaucoma Avanzado", d: "Pérdida severa de visión periférica (visión en túnel)." }
+            deuteranopia: { t: "Deuteranopía (Rojo / Verde)", d: "Confusión crítica entre alertas rojas, verdes y naranjas." },
+            tritanopia: { t: "Tritanopía (Azul / Amarillo)", d: "Confusión entre tonos azules/verdes y amarillos/rosas." },
+            acromatopsia: { t: "Acromatopsia Total", d: "Ausencia total de percepción del color (solo escala de grises)." },
+            cataratas: { t: "Cataratas Severas", d: "Pérdida de contraste, opacidad amarillenta y visión borrosa." },
+            glaucoma: { t: "Glaucoma Avanzado", d: "Pérdida severa de visión periférica (visión en túnel)." },
+            macular: { t: "Degeneración Macular (DMAE)", d: "Mancha ciega (escotoma) justo en el punto donde miras." },
+            retinopatia: { t: "Retinopatía Diabética", d: "Manchas oscuras dispersas (hemorragias) y visión turbia." }
         };
 
         async function startCamera() {
@@ -102,25 +233,31 @@
                 video.srcObject = stream;
                 document.getElementById('start-screen').style.display = 'none';
             } catch (err) {
-                alert("No se pudo acceder a la cámara. Asegúrate de abrir la web en Safari/Chrome (no dentro de Instagram/WhatsApp) y aceptar los permisos.");
+                alert("No se pudo acceder a la cámara. Asegúrate de abrir la web en Safari o Chrome y aceptar los permisos.");
             }
         }
 
         function setFilter(type, btn) {
-            // Resetear clases
             video.className = '';
             overlay.className = '';
-            document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             
-            // Activar botón
             btn.classList.add('active');
+            btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            
             title.innerText = info[type].t;
             desc.innerText = info[type].d;
 
-            // Aplicar filtro
-            if (type === 'daltonismo') video.classList.add('filter-daltonismo');
+            if (type === 'deuteranopia') video.classList.add('filter-deuteranopia');
+            if (type === 'tritanopia') video.classList.add('filter-tritanopia');
+            if (type === 'acromatopsia') video.classList.add('filter-acromatopsia');
             if (type === 'cataratas') video.classList.add('filter-cataratas');
             if (type === 'glaucoma') overlay.classList.add('overlay-glaucoma');
+            if (type === 'macular') overlay.classList.add('overlay-macular');
+            if (type === 'retinopatia') {
+                video.classList.add('filter-retinopatia');
+                overlay.classList.add('overlay-retinopatia');
+            }
         }
     </script>
 </body>
